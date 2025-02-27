@@ -1,0 +1,15 @@
+{
+  "files": {
+    "main.css": "/spa-sandbox/static/css/main.f855e6bc.css",
+    "main.js": "/spa-sandbox/static/js/main.19c2a5db.js",
+    "static/js/453.a6a97343.chunk.js": "/spa-sandbox/static/js/453.a6a97343.chunk.js",
+    "index.html": "/spa-sandbox/index.html",
+    "main.f855e6bc.css.map": "/spa-sandbox/static/css/main.f855e6bc.css.map",
+    "main.19c2a5db.js.map": "/spa-sandbox/static/js/main.19c2a5db.js.map",
+    "453.a6a97343.chunk.js.map": "/spa-sandbox/static/js/453.a6a97343.chunk.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.f855e6bc.css",
+    "static/js/main.19c2a5db.js"
+  ]
+}
