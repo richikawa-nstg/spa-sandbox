@@ -1,15 +1,13 @@
 {
   "files": {
     "main.css": "/spa-sandbox/static/css/main.9fe40f7c.css",
-    "main.js": "/spa-sandbox/static/js/main.7f7b4ab6.js",
-    "static/js/453.a6a97343.chunk.js": "/spa-sandbox/static/js/453.a6a97343.chunk.js",
+    "main.js": "/spa-sandbox/static/js/main.c0987e46.js",
     "index.html": "/spa-sandbox/index.html",
     "main.9fe40f7c.css.map": "/spa-sandbox/static/css/main.9fe40f7c.css.map",
-    "main.7f7b4ab6.js.map": "/spa-sandbox/static/js/main.7f7b4ab6.js.map",
-    "453.a6a97343.chunk.js.map": "/spa-sandbox/static/js/453.a6a97343.chunk.js.map"
+    "main.c0987e46.js.map": "/spa-sandbox/static/js/main.c0987e46.js.map"
   },
   "entrypoints": [
     "static/css/main.9fe40f7c.css",
-    "static/js/main.7f7b4ab6.js"
+    "static/js/main.c0987e46.js"
   ]
 }
