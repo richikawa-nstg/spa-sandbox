@@ -5,6 +5,8 @@ services:
     build: .
     container_name: react-spa-dev
     ports:
-      - "3030:3000"
+      - "3000:3000"
     volumes:
       - ./app:/app
+    stdin_open: true # 標準入力を開いたままにする
+    tty: true # 疑似TTYを割り当てる

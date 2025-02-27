@@ -1,9 +1,12 @@
 FROM node:18-alpine
 
+# Gitをインストール（GitHub Pages デプロイのため）
+RUN apk add --no-cache git
+
 WORKDIR /app
 
 # ポート3000を公開
 EXPOSE 3000
 
-# コンテナ起動時にシェルを実行
-CMD ["/bin/sh", "-c", "tail -f /dev/null"]
+# 開発サーバーを起動
+CMD ["sh", "-c", "npm start"]
