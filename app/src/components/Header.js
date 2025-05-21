@@ -26,6 +26,15 @@ function Header() {
                 チャット
               </Link>
             </li>
+            {/* 追加 */}
+            <li className="nav-item">
+              <Link 
+                to="/map" 
+                className={`nav-link ${location.pathname === '/map' ? 'active' : ''}`}
+              >
+                マップ
+              </Link>
+            </li>
           </ul>
         </nav>
       </div>

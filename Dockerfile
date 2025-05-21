@@ -9,4 +9,4 @@ WORKDIR /app
 EXPOSE 3000
 
 # 開発サーバーを起動
-CMD ["sh", "-c", "npm start"]
+CMD ["sh", "-c", "cd /app && npm install && npm start"]
