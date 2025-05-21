@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import { v4 as uuidv4 } from 'uuid';  // UUIDをインポート
 import { db } from '../firebase';
 import { 
   doc,
@@ -43,6 +44,20 @@ function MapPage() {
   const [sharingEnabled, setSharingEnabled] = useState(false);
   const [status, setStatus] = useState('');
   const [locationError, setLocationError] = useState(false);
+  const [deviceId, setDeviceId] = useState('');
+  
+  // 初回レンダリング時にデバイスIDを取得または生成
+  useEffect(() => {
+    let storedDeviceId = localStorage.getItem('device_id');
+    
+    if (!storedDeviceId) {
+      storedDeviceId = uuidv4();
+      localStorage.setItem('device_id', storedDeviceId);
+    }
+    
+    setDeviceId(storedDeviceId);
+    console.log(`デバイスID: ${storedDeviceId}`);
+  }, []);
   
   // ユーザーの現在位置を取得
   const getUserLocation = useCallback(() => {
@@ -69,19 +84,20 @@ function MapPage() {
     );
   }, []);
 
-  // 位置情報を共有（ユーザーごとに1つのドキュメント）
+  // 位置情報を共有（デバイスIDをドキュメントIDとして使用）
   const shareLocation = useCallback(async () => {
-    if (!userLocation) return;
+    if (!userLocation || !deviceId) return;
     
     try {
-      console.log(`位置情報をFirebaseに保存/更新: ${username}, [${userLocation[0]}, ${userLocation[1]}]`);
+      console.log(`位置情報をFirebaseに保存/更新: デバイスID=${deviceId}, ユーザー=${username}`);
       
-      // ユーザー名をドキュメントIDとして使用
-      const userDocRef = doc(db, 'userLocations', username);
+      // デバイスIDをドキュメントIDとして使用
+      const userDocRef = doc(db, 'userLocations', deviceId);
       
       // ドキュメントを設定/更新
       await setDoc(userDocRef, {
         user: username,
+        device_id: deviceId,
         latitude: userLocation[0],
         longitude: userLocation[1],
         timestamp: serverTimestamp()
@@ -92,7 +108,7 @@ function MapPage() {
       console.error('位置情報の共有に失敗しました:', error);
       setStatus('位置情報の共有に失敗しました: ' + error.message);
     }
-  }, [userLocation, username]);
+  }, [userLocation, username, deviceId]);
 
   // 位置情報の共有を開始/停止
   const toggleLocationSharing = useCallback(() => {
@@ -115,7 +131,7 @@ function MapPage() {
 
   // 定期的に位置情報を共有（共有が有効な場合）
   useEffect(() => {
-    if (!sharingEnabled) return;
+    if (!sharingEnabled || !deviceId) return;
     
     // 初回共有
     if (userLocation) {
@@ -131,7 +147,7 @@ function MapPage() {
     }, 5 * 1000); // 5秒
     
     return () => clearInterval(interval);
-  }, [sharingEnabled, userLocation, shareLocation, getUserLocation, locationError]);
+  }, [sharingEnabled, userLocation, shareLocation, getUserLocation, locationError, deviceId]);
 
   // 1時間以内の位置情報を読み込み
   useEffect(() => {
@@ -164,6 +180,7 @@ function MapPage() {
             locationList.push({
               id: doc.id,
               username: data.user,
+              deviceId: data.device_id,
               position: [data.latitude, data.longitude],
               timestamp: timestamp
             });
@@ -231,6 +248,7 @@ function MapPage() {
             <div className="mb-3">
               <p>現在位置を5秒ごとに更新しています。各ユーザーの1時間以内の位置情報を表示しています。</p>
               <p>現在の共有ユーザー数: {locations.length}人</p>
+              <p>あなたのデバイスID: {deviceId.substring(0, 8)}...</p>
             </div>
 
             {/* デバッグ情報（開発時のみ表示） */}
@@ -240,6 +258,7 @@ function MapPage() {
                 <pre style={{ maxHeight: '150px', overflow: 'auto' }}>
                   {JSON.stringify(locations.map(loc => ({
                     user: loc.username,
+                    device: loc.deviceId?.substring(0, 8) + '...',
                     time: loc.timestamp.toLocaleString(),
                     minsAgo: Math.round((new Date() - loc.timestamp) / 60000)
                   })), null, 2)}
@@ -285,8 +304,8 @@ function MapPage() {
                 
                 {/* 共有された位置情報 */}
                 {locations.map((location) => (
-                  // 自分の位置は既に表示しているのでスキップ
-                  location.username !== username && (
+                  // 自分のデバイスIDと異なる場合のみ表示
+                  location.deviceId !== deviceId && (
                     <Marker 
                       key={location.id} 
                       position={location.position}
