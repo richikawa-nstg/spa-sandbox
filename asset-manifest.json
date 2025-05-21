@@ -1,13 +1,13 @@
 {
   "files": {
     "main.css": "/spa-sandbox/static/css/main.491c05f7.css",
-    "main.js": "/spa-sandbox/static/js/main.05310d38.js",
+    "main.js": "/spa-sandbox/static/js/main.ebf636f0.js",
     "index.html": "/spa-sandbox/index.html",
     "main.491c05f7.css.map": "/spa-sandbox/static/css/main.491c05f7.css.map",
-    "main.05310d38.js.map": "/spa-sandbox/static/js/main.05310d38.js.map"
+    "main.ebf636f0.js.map": "/spa-sandbox/static/js/main.ebf636f0.js.map"
   },
   "entrypoints": [
     "static/css/main.491c05f7.css",
-    "static/js/main.05310d38.js"
+    "static/js/main.ebf636f0.js"
   ]
 }
