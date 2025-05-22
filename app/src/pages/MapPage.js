@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import { v4 as uuidv4 } from 'uuid';  // UUIDをインポート
+import { v4 as uuidv4 } from 'uuid';
 import { db } from '../firebase';
 import { 
   doc,
@@ -23,6 +23,22 @@ L.Icon.Default.mergeOptions({
   iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
+
+// 2つの位置の距離を計算する関数（メートル単位）
+function calculateDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371e3; // 地球の半径（メートル）
+  const φ1 = lat1 * Math.PI/180;
+  const φ2 = lat2 * Math.PI/180;
+  const Δφ = (lat2-lat1) * Math.PI/180;
+  const Δλ = (lon2-lon1) * Math.PI/180;
+
+  const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+          Math.cos(φ1) * Math.cos(φ2) *
+          Math.sin(Δλ/2) * Math.sin(Δλ/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+  return R * c; // 距離（メートル）
+}
 
 // 現在位置を中心に地図を表示するコンポーネント
 function LocateMe() {
@@ -45,6 +61,13 @@ function MapPage() {
   const [status, setStatus] = useState('');
   const [locationError, setLocationError] = useState(false);
   const [deviceId, setDeviceId] = useState('');
+  
+  // 最適化のための状態
+  const [lastSentLocation, setLastSentLocation] = useState(null);
+  const [lastSentTime, setLastSentTime] = useState(null);
+  const [updateInterval, setUpdateInterval] = useState(30); // デフォルト30秒
+  const [minDistance, setMinDistance] = useState(10); // 最小移動距離（メートル）
+  const [minTimeInterval, setMinTimeInterval] = useState(30); // 最小時間間隔（秒）
   
   // 初回レンダリング時にデバイスIDを取得または生成
   useEffect(() => {
@@ -84,9 +107,47 @@ function MapPage() {
     );
   }, []);
 
-  // 位置情報を共有（デバイスIDをドキュメントIDとして使用）
+  // 位置情報を送信すべきかどうかを判断する関数
+  const shouldSendLocation = useCallback((currentLocation) => {
+    if (!currentLocation) return false;
+    
+    const now = new Date();
+    
+    // 最初の送信の場合は送信する
+    if (!lastSentLocation || !lastSentTime) {
+      return true;
+    }
+    
+    // 最小時間間隔をチェック
+    const timeDiff = (now - lastSentTime) / 1000; // 秒
+    if (timeDiff < minTimeInterval) {
+      console.log(`送信スキップ: 最後の送信から${Math.round(timeDiff)}秒しか経過していません`);
+      return false;
+    }
+    
+    // 位置の変化をチェック
+    const distance = calculateDistance(
+      lastSentLocation[0], lastSentLocation[1],
+      currentLocation[0], currentLocation[1]
+    );
+    
+    if (distance < minDistance) {
+      console.log(`送信スキップ: 移動距離が${Math.round(distance)}mで最小距離(${minDistance}m)未満です`);
+      return false;
+    }
+    
+    console.log(`送信実行: 移動距離${Math.round(distance)}m, 経過時間${Math.round(timeDiff)}秒`);
+    return true;
+  }, [lastSentLocation, lastSentTime, minDistance, minTimeInterval]);
+
+  // 位置情報を共有（最適化版）
   const shareLocation = useCallback(async () => {
     if (!userLocation || !deviceId) return;
+    
+    // 送信すべきかどうかを判断
+    if (!shouldSendLocation(userLocation)) {
+      return;
+    }
     
     try {
       console.log(`位置情報をFirebaseに保存/更新: デバイスID=${deviceId}, ユーザー=${username}`);
@@ -103,12 +164,16 @@ function MapPage() {
         timestamp: serverTimestamp()
       });
       
+      // 最後に送信した位置と時間を記録
+      setLastSentLocation(userLocation);
+      setLastSentTime(new Date());
+      
       setStatus(`位置情報を共有しました！ [${new Date().toLocaleTimeString()}]`);
     } catch (error) {
       console.error('位置情報の共有に失敗しました:', error);
       setStatus('位置情報の共有に失敗しました: ' + error.message);
     }
-  }, [userLocation, username, deviceId]);
+  }, [userLocation, username, deviceId, shouldSendLocation]);
 
   // 位置情報の共有を開始/停止
   const toggleLocationSharing = useCallback(() => {
@@ -138,16 +203,16 @@ function MapPage() {
       shareLocation();
     }
     
-    // 5秒ごとに位置情報を更新
+    // 設定された間隔で位置情報を更新
     const interval = setInterval(() => {
       getUserLocation();
       if (userLocation && !locationError) {
         shareLocation();
       }
-    }, 5 * 1000); // 5秒
+    }, updateInterval * 1000);
     
     return () => clearInterval(interval);
-  }, [sharingEnabled, userLocation, shareLocation, getUserLocation, locationError, deviceId]);
+  }, [sharingEnabled, userLocation, shareLocation, getUserLocation, locationError, deviceId, updateInterval]);
 
   // 1時間以内の位置情報を読み込み
   useEffect(() => {
@@ -229,6 +294,60 @@ function MapPage() {
               </div>
             </div>
 
+            {/* 最適化設定 */}
+            <div className="mb-3">
+              <h6>更新設定</h6>
+              <div className="row">
+                <div className="col-md-4">
+                  <label htmlFor="updateInterval" className="form-label">更新間隔（秒）</label>
+                  <select
+                    className="form-select"
+                    id="updateInterval"
+                    value={updateInterval}
+                    onChange={(e) => setUpdateInterval(Number(e.target.value))}
+                  >
+                    <option value="5">5秒（テスト用）</option>
+                    <option value="15">15秒</option>
+                    <option value="30">30秒（推奨）</option>
+                    <option value="60">1分</option>
+                    <option value="120">2分</option>
+                    <option value="300">5分</option>
+                  </select>
+                </div>
+                <div className="col-md-4">
+                  <label htmlFor="minDistance" className="form-label">最小移動距離（m）</label>
+                  <select
+                    className="form-select"
+                    id="minDistance"
+                    value={minDistance}
+                    onChange={(e) => setMinDistance(Number(e.target.value))}
+                  >
+                    <option value="0">0m（常に送信）</option>
+                    <option value="5">5m</option>
+                    <option value="10">10m（推奨）</option>
+                    <option value="25">25m</option>
+                    <option value="50">50m</option>
+                    <option value="100">100m</option>
+                  </select>
+                </div>
+                <div className="col-md-4">
+                  <label htmlFor="minTimeInterval" className="form-label">最小送信間隔（秒）</label>
+                  <select
+                    className="form-select"
+                    id="minTimeInterval"
+                    value={minTimeInterval}
+                    onChange={(e) => setMinTimeInterval(Number(e.target.value))}
+                  >
+                    <option value="0">0秒（制限なし）</option>
+                    <option value="15">15秒</option>
+                    <option value="30">30秒（推奨）</option>
+                    <option value="60">1分</option>
+                    <option value="120">2分</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
             <div className="mb-3">
               <button 
                 className={`btn ${sharingEnabled ? 'btn-danger' : 'btn-success'} w-100`} 
@@ -246,9 +365,12 @@ function MapPage() {
             )}
 
             <div className="mb-3">
-              <p>現在位置を5秒ごとに更新しています。各ユーザーの1時間以内の位置情報を表示しています。</p>
+              <p>位置情報を{updateInterval}秒ごとにチェックし、{minDistance}m以上移動した場合のみ送信します。</p>
               <p>現在の共有ユーザー数: {locations.length}人</p>
               <p>あなたのデバイスID: {deviceId.substring(0, 8)}...</p>
+              {lastSentTime && (
+                <p>最後の送信: {lastSentTime.toLocaleTimeString()}</p>
+              )}
             </div>
 
             {/* デバッグ情報（開発時のみ表示） */}
@@ -256,12 +378,18 @@ function MapPage() {
               <details>
                 <summary>デバッグ情報</summary>
                 <pre style={{ maxHeight: '150px', overflow: 'auto' }}>
-                  {JSON.stringify(locations.map(loc => ({
-                    user: loc.username,
-                    device: loc.deviceId?.substring(0, 8) + '...',
-                    time: loc.timestamp.toLocaleString(),
-                    minsAgo: Math.round((new Date() - loc.timestamp) / 60000)
-                  })), null, 2)}
+                  {JSON.stringify({
+                    locations: locations.map(loc => ({
+                      user: loc.username,
+                      device: loc.deviceId?.substring(0, 8) + '...',
+                      time: loc.timestamp.toLocaleString(),
+                      minsAgo: Math.round((new Date() - loc.timestamp) / 60000)
+                    })),
+                    lastSent: lastSentLocation ? {
+                      time: lastSentTime?.toLocaleTimeString(),
+                      location: lastSentLocation
+                    } : null
+                  }, null, 2)}
                 </pre>
               </details>
             </div>
